@@ -9,16 +9,13 @@ import { authenticate } from "../shopify.server";
 export const loader = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
   
-  // Extract custom lookup days value from URL search params (defaults to 30 days)
   const url = new URL(request.url);
   const lookbackDays = parseInt(url.searchParams.get("days") || "30", 10);
 
-  // Compute precise date boundary
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - lookbackDays);
   const cutoffDateISO = cutoffDate.toISOString();
 
-  // Fetch products and recent orders within the dynamic window
   const response = await admin.graphql(
     `#graphql
     query getStagnantInventory($orderQuery: String!) {
@@ -62,7 +59,6 @@ export const loader = async ({ request }) => {
   const allProducts = responseJson.data?.products?.edges || [];
   const recentOrders = responseJson.data?.orders?.edges || [];
 
-  // Map out product IDs that had active orders inside our time window
   const activeProductIds = new Set();
   recentOrders.forEach(({ node: order }) => {
     order.lineItems?.edges?.forEach(({ node: item }) => {
@@ -74,7 +70,6 @@ export const loader = async ({ request }) => {
 
   const deadStockProducts = [];
 
-  // Filter products that have NOT seen any sales in the specified window
   allProducts.forEach(({ node: product }) => {
     const hasSales = activeProductIds.has(product.id);
     
@@ -87,7 +82,6 @@ export const loader = async ({ request }) => {
         if (variant.price) samplePrice = variant.price;
       });
 
-      // Only display items that actually have inventory balance left
       if (totalQty > 0) {
         deadStockProducts.push({
           id: product.id,
@@ -116,90 +110,144 @@ export default function StagnantFilterDashboard() {
 
   const [filterDays, setFilterDays] = useState(currentDaysApplied);
 
-  // Triggers reload with custom inputs
   const handleFilterUpdate = (daysValue) => {
     setFilterDays(daysValue);
     submit({ days: daysValue }, { method: "GET" });
   };
 
-  // Base Clean UI Styling Blocks
-  const layoutCard = { background: "#fff", padding: "20px", borderRadius: "8px", border: "1px solid #e1e3e5", marginBottom: "20px" };
+  // Modern SaaS Container Card Styling
+  const layoutCard = { 
+    background: "#fff", 
+    padding: "24px", 
+    borderRadius: "16px", 
+    border: "1px solid #e2e8f0", 
+    boxShadow: "0 4px 20px rgba(0, 0, 0, 0.02)",
+    marginBottom: "24px" 
+  };
+
+  // Colorful Premium Filter Action Button States
   const filterBtn = (val) => ({
-    padding: "8px 16px",
-    borderRadius: "6px",
-    border: "1px solid #b6b7b9",
-    background: filterDays === val ? "#007ac1" : "#fff",
-    color: filterDays === val ? "#fff" : "#202123",
-    fontWeight: "600",
-    cursor: "pointer"
+    padding: "10px 20px",
+    borderRadius: "20px",
+    border: filterDays === val ? "none" : "1px solid #cbd5e1",
+    background: filterDays === val ? "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)" : "#fff",
+    color: filterDays === val ? "#fff" : "#334155",
+    fontWeight: "700",
+    fontSize: "13px",
+    cursor: "pointer",
+    boxShadow: filterDays === val ? "0 4px 10px rgba(59, 130, 246, 0.25)" : "none",
+    transition: "all 0.2s ease"
   });
 
   return (
-    <s-page>
+    <s-page style={{ fontFamily: "system-ui, sans-serif", padding: "12px 0" }}>
+      
       {/* HEADER ROW */}
-      <div style={{ marginBottom: "24px" }}>
-        <h1 style={{ fontSize: "20px", fontWeight: "700", color: "#1a1c1d", margin: "0 0 4px 0" }}>Dead Stock Finder</h1>
-        <p style={{ color: "#6d7175", fontSize: "13px", margin: "0" }}>Isolate specific products that haven't generated a single sale across custom calendar windows.</p>
+      <div style={{ marginBottom: "28px" }}>
+        <h1 style={{ fontSize: "26px", fontWeight: "800", margin: "0 0 6px 0", background: "linear-gradient(90deg, #3b82f6, #8b5cf6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", letterSpacing: "-0.03em" }}>
+          Dead Stock Finder
+        </h1>
+        <p style={{ color: "#64748b", fontSize: "14px", margin: "0", fontWeight: "500" }}>
+          Isolate specific products that haven't generated a single sale across custom calendar windows.
+        </p>
       </div>
 
       {/* DYNAMIC TIME FILTER CONTROLLER */}
       <div style={layoutCard}>
-        <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#202123", marginBottom: "12px" }}>
+        <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: "14px" }}>
           Select Stagnant Inactivity Window:
         </label>
         
-        <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
           <button style={filterBtn(7)} onClick={() => handleFilterUpdate(7)}>Last 7 Days</button>
           <button style={filterBtn(30)} onClick={() => handleFilterUpdate(30)}>Last 30 Days</button>
           <button style={filterBtn(60)} onClick={() => handleFilterUpdate(60)}>Last 60 Days</button>
           
-          <span style={{ color: "#6d7175", fontSize: "13px", margin: "0 4px" }}>or custom:</span>
+          <span style={{ color: "#94a3b8", fontSize: "14px", fontWeight: "600", margin: "0 4px" }}>or custom lookback:</span>
           
-          <input 
-            type="number" 
-            placeholder="Enter days"
-            value={filterDays}
-            onChange={(e) => setFilterDays(e.target.value)}
-            onBlur={(e) => handleFilterUpdate(e.target.value || 30)}
-            style={{ width: "110px", padding: "7px 12px", border: "1px solid #b6b7b9", borderRadius: "6px", fontSize: "14px" }}
-          />
-          <span style={{ fontSize: "13px", color: "#6d7175" }}>Days Unsold</span>
+          <div style={{ position: "relative", display: "inline-block" }}>
+            <input 
+              type="number" 
+              placeholder="Days"
+              value={filterDays}
+              onChange={(e) => setFilterDays(e.target.value)}
+              onBlur={(e) => handleFilterUpdate(e.target.value || 30)}
+              style={{ 
+                width: "120px", 
+                padding: "9px 32px 9px 14px", 
+                border: "2px solid #e2e8f0", 
+                borderRadius: "12px", 
+                fontSize: "14px",
+                fontWeight: "600",
+                color: "#1e293b",
+                outline: "none"
+              }}
+            />
+            <span style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", fontSize: "12px", fontWeight: "700", color: "#94a3b8" }}>d</span>
+          </div>
         </div>
       </div>
 
       {/* DYNAMIC PRODUCTS OUTPUT DISPLAY PANEL */}
       <div style={layoutCard}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", paddingBottom: "12px", borderBottom: "1px solid #f1f2f4" }}>
-          <h2 style={{ fontSize: "15px", fontWeight: "700", margin: "0", color: "#1a1c1d" }}>
-            Stagnant Results ({deadStockProducts.length} items found)
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", paddingBottom: "14px", borderBottom: "2px solid #f1f5f9" }}>
+          <h2 style={{ fontSize: "16px", fontWeight: "800", margin: "0", color: "#1e293b" }}>
+            Stagnant Pipeline Results ({deadStockProducts.length} items found)
           </h2>
-          {isLoading && <span style={{ fontSize: "13px", color: "#0066cc", fontWeight: "500" }}>Refreshing pipeline inventory...</span>}
+          {isLoading && (
+            <span style={{ fontSize: "13px", color: "#2563eb", fontWeight: "700", animation: "pulse 1.5s infinite" }}>
+              ⚡ Syncing data fields...
+            </span>
+          )}
         </div>
 
         {deadStockProducts.length === 0 ? (
-          <div style={{ padding: "40px 16px", textAlign: "center", color: "#6d7175", fontSize: "14px" }}>
-            🎉 Great news! All stocked products have generated conversions within the past <strong>{currentDaysApplied} days</strong>.
+          <div style={{ 
+            background: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)", 
+            border: "1px solid #a7f3d0", 
+            borderRadius: "12px", 
+            padding: "32px 16px", 
+            textAlign: "center", 
+            color: "#065f46", 
+            fontSize: "15px",
+            fontWeight: "600"
+          }}>
+            🎉 Great news! All catalog products have generated channel conversions within the past {currentDaysApplied} days.
           </div>
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", textAlign: "left" }}>
               <thead>
-                <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e1e3e5" }}>
-                  <th style={{ padding: "12px", color: "#6d7175", fontWeight: "600" }}>Product Variant Title</th>
-                  <th style={{ padding: "12px", color: "#6d7175", fontWeight: "600" }}>Available Inventory</th>
-                  <th style={{ padding: "12px", color: "#6d7175", fontWeight: "600" }}>Storefront Price</th>
-                  <th style={{ padding: "12px", color: "#6d7175", fontWeight: "600" }}>Status Trigger</th>
+                <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0", color: "#475569" }}>
+                  <th style={{ padding: "16px 24px", fontWeight: "700", fontSize: "13px", textTransform: "uppercase", letterSpacing: "0.03em" }}>Product Variant Title</th>
+                  <th style={{ padding: "16px 24px", fontWeight: "700", fontSize: "13px", textTransform: "uppercase", letterSpacing: "0.03em" }}>Available Inventory</th>
+                  <th style={{ padding: "16px 24px", fontWeight: "700", fontSize: "13px", textTransform: "uppercase", letterSpacing: "0.03em" }}>Storefront Price</th>
+                  <th style={{ padding: "16px 24px", fontWeight: "700", fontSize: "13px", textTransform: "uppercase", letterSpacing: "0.03em" }}>Status Trigger</th>
                 </tr>
               </thead>
               <tbody>
                 {deadStockProducts.map((product) => (
-                  <tr key={product.id} style={{ borderBottom: "1px solid #f1f2f4", color: "#202123" }}>
-                    <td style={{ padding: "12px", fontWeight: "600" }}>{product.title}</td>
-                    <td style={{ padding: "12px", color: "#b02a37", fontWeight: "700" }}>{product.qty} units left</td>
-                    <td style={{ padding: "12px" }}>{product.price}</td>
-                    <td style={{ padding: "12px" }}>
-                      <span style={{ padding: "4px 8px", background: "#fff0f0", color: "#b02a37", borderRadius: "4px", fontSize: "12px", fontWeight: "500" }}>
-                        0 Sales in {currentDaysApplied} Days
+                  <tr 
+                    key={product.id} 
+                    style={{ borderBottom: "1px solid #f1f5f9", color: "#334155", transition: "background 0.15s ease" }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f8fafc"}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                  >
+                    <td style={{ padding: "16px 24px", fontWeight: "700", color: "#1e293b", fontSize: "15px" }}>{product.title}</td>
+                    <td style={{ padding: "16px 24px", color: "#ef4444", fontWeight: "700" }}>{product.qty} units left</td>
+                    <td style={{ padding: "16px 24px", fontWeight: "600", color: "#64748b" }}>{product.price}</td>
+                    <td style={{ padding: "16px 24px" }}>
+                      <span style={{ 
+                        padding: "5px 12px", 
+                        background: "#fff5f5", 
+                        color: "#e03131", 
+                        borderRadius: "8px", 
+                        fontSize: "12px", 
+                        fontWeight: "700",
+                        border: "1px solid #ffc9c9",
+                        display: "inline-block"
+                      }}>
+                        0 Sales / {currentDaysApplied} Days
                       </span>
                     </td>
                   </tr>

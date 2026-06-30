@@ -1,16 +1,14 @@
-import { useLoaderData, useRevalidator } from "react-router"; // 1. Import useRevalidator
+import { useLoaderData, useRevalidator } from "react-router"; 
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 
 export const loader = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
 
-  // 1. Calculate the date for 7 days ago in ISO format
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const sevenDaysAgoISO = sevenDaysAgo.toISOString();
 
-  // 2. Fetch products (with variants and inventory cost metrics) and recent orders
   const response = await admin.graphql(
     `#graphql
     query getInventoryMetricsAndOrders($orderQuery: String!) {
@@ -65,7 +63,6 @@ export const loader = async ({ request }) => {
   const allProducts = responseJson.data?.products?.edges || [];
   const recentOrders = responseJson.data?.orders?.edges || [];
 
-  // 3. Extract IDs of all products that HAVE been ordered in the last 7 days
   const orderedProductIds = new Set();
   recentOrders.forEach(({ node: order }) => {
     order.lineItems?.edges?.forEach(({ node: item }) => {
@@ -75,7 +72,6 @@ export const loader = async ({ request }) => {
     });
   });
 
-  // 4. Core Calculations for Summary Metrics Box Row & Table Items list
   let totalProductsCount = allProducts.length;
   let deadInventoryCount = 0;
   let inventoryValue = 0;
@@ -99,16 +95,13 @@ export const loader = async ({ request }) => {
           productTotalQty += quantity;
           productCapitalTiedValue += (quantity * costPerItem);
         }
-        // Save the first available price to represent the product price row
         if (!samplePrice && variant.price) {
           samplePrice = parseFloat(variant.price);
         }
       });
 
-      // Add to running metrics total cash tied up
       inventoryValue += productCapitalTiedValue;
 
-      // Only add to table if the product actually has positive stock sitting in storage
       if (productTotalQty > 0) {
         tableItemsList.push({
           id: product.id,
@@ -123,10 +116,8 @@ export const loader = async ({ request }) => {
     }
   });
 
-  // Sort descending by highest capital tied up value
   tableItemsList.sort((a, b) => b.rawCapitalTied - a.rawCapitalTied);
 
-  // Calculate estimated recovery based on your 28% model
   const estimatedRecovery = inventoryValue * 0.28;
 
   return {
@@ -142,124 +133,146 @@ export const loader = async ({ request }) => {
 
 export default function Index() {
   const { metrics, deadStockTableItems } = useLoaderData();
-  const revalidator = useRevalidator(); // 2. Initialize the revalidator
+  const revalidator = useRevalidator(); 
 
   const handleScanNow = () => {
     if (revalidator.state === "idle") {
-      revalidator.revalidate(); // 3. This triggers the server side loader to run again
+      revalidator.revalidate(); 
     }
   };
 
   return (
     <s-page>
-      {/* HEADER SECTION WITH SCAN NOW BUTTON */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+      {/* HEADER SECTION */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px" }}>
         <div>
-          <h1 style={{ fontSize: "20px", fontWeight: "600", margin: 0, color: "#202123" }}>IdleStock Dashboard</h1>
-          <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#6d7175" }}>
-            Last scan: {new Date().toLocaleDateString()}
+          <h1 style={{ fontSize: "26px", fontWeight: "800", margin: 0, background: "linear-gradient(90deg, #3b82f6, #8b5cf6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", letterSpacing: "-0.03em" }}>
+            IdleStock Dashboard
+          </h1>
+          <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#64748b", fontWeight: "500" }}>
+            System Sync: <span style={{ color: "#3b82f6" }}>{new Date().toLocaleDateString()}</span>
           </p>
         </div>
         <button 
           onClick={handleScanNow}
           disabled={revalidator.state === "loading"}
           style={{
-            background: "#202123",
+            background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
             color: "#fff",
             border: "none",
-            padding: "8px 16px",
-            borderRadius: "6px",
-            fontWeight: "500",
+            padding: "10px 20px",
+            borderRadius: "20px",
+            fontWeight: "600",
             cursor: revalidator.state === "loading" ? "not-allowed" : "pointer",
             opacity: revalidator.state === "loading" ? 0.7 : 1,
-            fontSize: "14px"
+            fontSize: "14px",
+            boxShadow: "0 4px 12px rgba(37, 99, 235, 0.2)",
+            transition: "all 0.2s ease"
           }}
         >
-          {revalidator.state === "loading" ? "Scanning..." : "Scan Now"}
+          {revalidator.state === "loading" ? "Analyzing Store..." : "Scan Now"}
         </button>
       </div>
 
       {/* SCAN CONFIRMATION BANNER */}
       <div style={{ 
-        background: "#f1f8f5", 
-        border: "1px solid #a3cfbb", 
-        borderRadius: "8px", 
-        padding: "12px 16px", 
-        marginBottom: "24px",
+        background: "linear-gradient(90deg, #ecfdf5 0%, #f0fdf4 100%)", 
+        border: "1px solid #10b981", 
+        borderRadius: "12px", 
+        padding: "14px 20px", 
+        marginBottom: "28px",
         display: "flex",
         alignItems: "center",
         fontSize: "14px",
-        color: "#146c43"
+        fontWeight: "600",
+        color: "#047857",
+        boxShadow: "0 2px 4px rgba(16, 185, 129, 0.05)"
       }}>
-        <span style={{ marginRight: "8px" }}>✓</span> 
-        Scan completed. {metrics.totalProducts} products analyzed.
+        <span style={{ marginRight: "10px", fontSize: "18px" }}></span> 
+        Optimization engine complete! {metrics.totalProducts} items analyzed for dead stock trends.
       </div>
       
       {/* METRICS OVERVIEW CARDS ROW */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", marginBottom: "24px" }}>
-        <s-box padding="base" borderWidth="base" borderRadius="base" background="surface">
-          <s-stack direction="block" gap="tight">
-            <s-text variant="subheadingSm" color="subdued">Total Products</s-text>
-            <s-text variant="headingLg">{metrics.totalProducts}</s-text>
-          </s-stack>
-        </s-box>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "20px", marginBottom: "32px" }}>
+        
+        {/* Card 1: Blue Theme */}
+        <div style={{ background: "linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 100%)", border: "1px solid #bae6fd", borderRadius: "14px", padding: "20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.03)" }}>
+          <div style={{ fontSize: "12px", fontWeight: "700", textTransform: "uppercase", color: "#0369a1", letterSpacing: "0.05em", marginBottom: "6px" }}>Total Products</div>
+          <div style={{ fontSize: "28px", fontWeight: "800", color: "#0c4a6e" }}>{metrics.totalProducts}</div>
+        </div>
 
-        <s-box padding="base" borderWidth="base" borderRadius="base" background="surface">
-          <s-stack direction="block" gap="tight">
-            <s-text variant="subheadingSm" color="subdued">Dead Inventory</s-text>
-            <s-text variant="headingLg" color="critical">{metrics.deadInventory}</s-text>
-          </s-stack>
-        </s-box>
+        {/* Card 2: Orange/Red Theme */}
+        <div style={{ background: "linear-gradient(135deg, #fff5f5 0%, #ffe3e3 100%)", border: "1px solid #ffa8a8", borderRadius: "14px", padding: "20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.03)" }}>
+          <div style={{ fontSize: "12px", fontWeight: "700", textTransform: "uppercase", color: "#c92a2a", letterSpacing: "0.05em", marginBottom: "6px" }}>Dead Inventory</div>
+          <div style={{ fontSize: "28px", fontWeight: "800", color: "#e03131" }}>{metrics.deadInventory}</div>
+        </div>
 
-        <s-box padding="base" borderWidth="base" borderRadius="base" background="surface">
-          <s-stack direction="block" gap="tight">
-            <s-text variant="subheadingSm" color="subdued">Inventory Value</s-text>
-            <s-text variant="headingLg">{metrics.inventoryValue}</s-text>
-          </s-stack>
-        </s-box>
+        {/* Card 3: Violet Theme */}
+        <div style={{ background: "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)", border: "1px solid #e9d5ff", borderRadius: "14px", padding: "20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.03)" }}>
+          <div style={{ fontSize: "12px", fontWeight: "700", textTransform: "uppercase", color: "#6b21a8", letterSpacing: "0.05em", marginBottom: "6px" }}>Inventory Value</div>
+          <div style={{ fontSize: "28px", fontWeight: "800", color: "#4c1d95" }}>{metrics.inventoryValue}</div>
+        </div>
 
-        <s-box padding="base" borderWidth="base" borderRadius="base" background="surface">
-          <s-stack direction="block" gap="tight">
-            <s-text variant="subheadingSm" color="subdued">Estimated Recovery</s-text>
-            <s-text variant="headingLg" color="success">{metrics.estimatedRecovery}</s-text>
-          </s-stack>
-        </s-box>
+        {/* Card 4: Emerald Green Theme */}
+        <div style={{ background: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)", border: "1px solid #a7f3d0", borderRadius: "14px", padding: "20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.03)" }}>
+          <div style={{ fontSize: "12px", fontWeight: "700", textTransform: "uppercase", color: "#065f46", letterSpacing: "0.05em", marginBottom: "6px" }}>Estimated Recovery</div>
+          <div style={{ fontSize: "28px", fontWeight: "800", color: "#064e3b" }}>{metrics.estimatedRecovery}</div>
+        </div>
       </div>
 
-      {/* PRODUCTS COMPACTED DATA TABLE DISPLAY */}
+      {/* PRODUCTS TABLE DISPLAY */}
       <s-section heading="Dead Stock Items">
-        <div style={{ background: "#fff", border: "1px solid #e1e3e5", borderRadius: "8px", overflow: "hidden", marginTop: "12px" }}>
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.02)", overflow: "hidden", marginTop: "16px" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "14px" }}>
             <thead>
-              <tr style={{ background: "#f6f6f7", borderBottom: "1px solid #e1e3e5", color: "#6d7175" }}>
-                <th style={{ padding: "12px 16px", fontWeight: "500" }}>Product</th>
-                <th style={{ padding: "12px 16px", fontWeight: "500" }}>Qty</th>
-                <th style={{ padding: "12px 16px", fontWeight: "500" }}>Days Unsold</th>
-                <th style={{ padding: "12px 16px", fontWeight: "500" }}>Price</th>
-                <th style={{ padding: "12px 16px", fontWeight: "500" }}>Capital Tied</th>
-                <th style={{ padding: "12px 16px", fontWeight: "500" }}>Action</th>
+              <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0", color: "#475569" }}>
+                <th style={{ padding: "16px 24px", fontWeight: "700", fontSize: "13px" }}>Product Title</th>
+                <th style={{ padding: "16px 24px", fontWeight: "700", fontSize: "13px" }}>Qty</th>
+                <th style={{ padding: "16px 24px", fontWeight: "700", fontSize: "13px" }}>Days Unsold</th>
+                <th style={{ padding: "16px 24px", fontWeight: "700", fontSize: "13px" }}>Retail Price</th>
+                <th style={{ padding: "16px 24px", fontWeight: "700", fontSize: "13px" }}>Capital Tied Up</th>
+                <th style={{ padding: "16px 24px", fontWeight: "700", fontSize: "13px" }}>Action Action</th>
               </tr>
             </thead>
             <tbody>
               {deadStockTableItems.length === 0 ? (
                 <tr>
-                  <td colSpan="6" style={{ padding: "32px", textAlign: "center", color: "#6d7175" }}>
-                    No dead stock products found.
+                  <td colSpan="6" style={{ padding: "48px 24px", textAlign: "center", color: "#64748b", fontSize: "14px", fontWeight: "500" }}>
+                    Your catalog is clear! No stagnant stock found.
                   </td>
                 </tr>
               ) : (
                 deadStockTableItems.map((item) => (
-                  <tr key={item.id} style={{ borderBottom: "1px solid #e1e3e5", color: "#202123" }}>
-                    <td style={{ padding: "12px 16px" }}>
-                      <div style={{ fontWeight: "600", color: "#202123" }}>{item.productTitle}</div>
+                  <tr 
+                    key={item.id} 
+                    style={{ borderBottom: "1px solid #f1f5f9", color: "#334155" }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f8fafc"}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                  >
+                    <td style={{ padding: "16px 24px" }}>
+                      <div style={{ fontWeight: "700", color: "#1e293b" }}>{item.productTitle}</div>
                     </td>
-                    <td style={{ padding: "12px 16px" }}>{item.qty}</td>
-                    <td style={{ padding: "12px 16px" }}>{item.daysUnsold}</td>
-                    <td style={{ padding: "12px 16px" }}>{item.price}</td>
-                    <td style={{ padding: "12px 16px", fontWeight: "600", color: "#b02a37" }}>{item.capitalTied}</td>
-                    <td style={{ padding: "12px 16px" }}>
-                      <span style={{ background: "#e2f1ff", color: "#0066cc", padding: "4px 12px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", display: "inline-block" }}>
-                        Bundle
+                    <td style={{ padding: "16px 24px", fontWeight: "500" }}>{item.qty}</td>
+                    <td style={{ padding: "16px 24px" }}>
+                      <span style={{ color: "#ea580c", background: "#fff7ed", padding: "3px 8px", borderRadius: "6px", fontWeight: "600", fontSize: "13px" }}>
+                        {item.daysUnsold} days
+                      </span>
+                    </td>
+                    <td style={{ padding: "16px 24px", color: "#64748b" }}>{item.price}</td>
+                    <td style={{ padding: "16px 24px", fontWeight: "700", color: "#ef4444" }}>{item.capitalTied}</td>
+                    <td style={{ padding: "16px 24px" }}>
+                      <span style={{ 
+                        background: "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)", 
+                        color: "#fff", 
+                        padding: "6px 14px", 
+                        borderRadius: "20px", 
+                        fontSize: "12px", 
+                        fontWeight: "700", 
+                        display: "inline-block",
+                        cursor: "pointer",
+                        boxShadow: "0 2px 6px rgba(14, 165, 233, 0.25)"
+                      }}>
+                         Create Bundle
                       </span>
                     </td>
                   </tr>
