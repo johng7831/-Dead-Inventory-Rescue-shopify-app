@@ -231,13 +231,12 @@ export default function Index() {
                 <th style={{ padding: "16px 24px", fontWeight: "700", fontSize: "13px" }}>Days Unsold</th>
                 <th style={{ padding: "16px 24px", fontWeight: "700", fontSize: "13px" }}>Retail Price</th>
                 <th style={{ padding: "16px 24px", fontWeight: "700", fontSize: "13px" }}>Capital Tied Up</th>
-                <th style={{ padding: "16px 24px", fontWeight: "700", fontSize: "13px" }}>Action Action</th>
               </tr>
             </thead>
             <tbody>
               {deadStockTableItems.length === 0 ? (
                 <tr>
-                  <td colSpan="6" style={{ padding: "48px 24px", textAlign: "center", color: "#64748b", fontSize: "14px", fontWeight: "500" }}>
+                  <td colSpan="5" style={{ padding: "48px 24px", textAlign: "center", color: "#64748b", fontSize: "14px", fontWeight: "500" }}>
                     Your catalog is clear! No stagnant stock found.
                   </td>
                 </tr>
@@ -260,21 +259,6 @@ export default function Index() {
                     </td>
                     <td style={{ padding: "16px 24px", color: "#64748b" }}>{item.price}</td>
                     <td style={{ padding: "16px 24px", fontWeight: "700", color: "#ef4444" }}>{item.capitalTied}</td>
-                    <td style={{ padding: "16px 24px" }}>
-                      <span style={{ 
-                        background: "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)", 
-                        color: "#fff", 
-                        padding: "6px 14px", 
-                        borderRadius: "20px", 
-                        fontSize: "12px", 
-                        fontWeight: "700", 
-                        display: "inline-block",
-                        cursor: "pointer",
-                        boxShadow: "0 2px 6px rgba(14, 165, 233, 0.25)"
-                      }}>
-                         Create Bundle
-                      </span>
-                    </td>
                   </tr>
                 ))
               )}
